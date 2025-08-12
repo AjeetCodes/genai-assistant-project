@@ -7,9 +7,11 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
+import docx
 import asyncio
+
 class RagPipline:
-    pdfFileContent = ""
+    fileContent = ""
     def __init__(self):
         self.configObj = Config()
         self.loggerObj = AppLogger("rag_pipleline", logging.INFO).setupLogger()
@@ -26,8 +28,21 @@ class RagPipline:
             pages = loader.load()
             # self.loggerObj.info(f"page content {str(pages[0].page_content)}")
             for page in pages:
-                self.pdfFileContent += page.page_content
-            self.loggerObj.info(f"file content {str(self.pdfFileContent)}")
+                self.fileContent += page.page_content
+            self.loggerObj.info(f"file content {str(self.fileContent)}")
+            self.embeddingsTexts()
+    def loadDocx(self, docFile):
+        folderPath = os.path.join(self.configObj.ROOT_PATH, 'data')
+        if not os.path.exists(folderPath):
+            os.makedirs(folderPath)
+        filePath = os.path.join(self.configObj.ROOT_PATH, 'data', 'temp.docx')
+        self.loggerObj.info(f"file{filePath}")
+        with open(filePath, "w", encoding="utf-8") as file:
+            doc = docx.Document(docFile)
+            text = "\n".join([para.text for para in doc.paragraphs])
+            file.write(text)
+            self.fileContent = text
+            self.loggerObj.info(f"file content {str(self.fileContent)}")
             self.embeddingsTexts()
     def embeddingsTexts(self):
         try:
@@ -35,8 +50,8 @@ class RagPipline:
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500)
-        chunk = text_splitter.split_text(self.pdfFileContent)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        chunk = text_splitter.split_text(self.fileContent)
         embiddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         vectore_store = Chroma.from_texts(
             texts=chunk,
@@ -62,4 +77,11 @@ class RagPipline:
             retriever=retriever,
             return_source_documents=True  # Optional: show source context
         )
-        return qa_chain(query)
+        result = qa_chain(query)
+        if "source_documents" in result:
+            for i, doc in enumerate(result["source_documents"], start=1):
+                self.loggerObj.info(f"Source {i}: {doc.metadata}")
+                self.loggerObj.info(f"Content: {doc.page_content[:200]}...")  # show first 200 chars
+        else:
+            self.loggerObj.warning("No source documents returned!")
+        return result

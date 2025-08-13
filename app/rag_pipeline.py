@@ -5,7 +5,8 @@ import os
 from langchain.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
-from langchain.vectorstores import Chroma
+# from langchain.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain.chains import RetrievalQA
 import docx
 import asyncio
@@ -53,12 +54,12 @@ class RagPipline:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         chunk = text_splitter.split_text(self.fileContent)
         embiddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        vectore_store = Chroma.from_texts(
+        Chroma.from_texts(
             texts=chunk,
             embedding=embiddings,
             persist_directory='./chroma_store'
         )
-        res = vectore_store.persist()
+        # res = vectore_store.persist()
     def retriever(self, query):
         try:
             asyncio.get_running_loop()
@@ -77,7 +78,8 @@ class RagPipline:
             retriever=retriever,
             return_source_documents=True  # Optional: show source context
         )
-        result = qa_chain(query)
+        # result = qa_chain(query)
+        result = qa_chain.invoke(query)
         if "source_documents" in result:
             for i, doc in enumerate(result["source_documents"], start=1):
                 self.loggerObj.info(f"Source {i}: {doc.metadata}")

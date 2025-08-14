@@ -7,13 +7,24 @@ import time
 logger = AppLogger('streamlit', logging.INFO).setupLogger()
 
 config = Config()
-ragPipeline = RagPipline()
-api_key = config.GEMINI_API_KEY
-logger.info("App started")
-logger.info(f"api key {api_key}")
+# ragPipeline = RagPipline()
+
 
 st.set_page_config(layout="wide", page_title="Multi-PDF Upload", page_icon="📄")
 st.title("PDF Gen AI Assistant")
+with st.sidebar:
+    st.header("⚙️ Settings")
+    selected_tone = st.selectbox("Assistant Tone", ["Friendly", "Professional", "Funny", "Technical"])
+    selectedLlmModel = st.selectbox("Select LLM Model", Config().LLM_CONFIG.keys())
+
+    if st.button("🗑️ Clear Chat"):
+        st.session_state.messages = []
+        st.rerun()
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+ragPipeline = RagPipline(selectedLlmModel)
 
 upload_file = st.file_uploader("Upload one or more PDFs", type=['pdf', 'docx'], accept_multiple_files=True)
 

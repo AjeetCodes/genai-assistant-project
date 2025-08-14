@@ -5,17 +5,17 @@ import logging
 from rag_pipeline import RagPipline
 from langchain.memory import ConversationBufferMemory
 from langchain_core.messages import HumanMessage, AIMessage
-
+from config import Config
 logger = AppLogger('streamlit', logging.INFO).setupLogger()
 
 config = Config()
-ragPipeline = RagPipline()
 api_key = config.GEMINI_API_KEY
 logger.info("App started")
 logger.info(f"api key {api_key}")
 
 st.set_page_config(layout="wide", page_title="Multi-Docs Upload", page_icon="📄")
 # st.title("Gen AI Assistant")
+
 st.markdown("""
     <style>
         .stApp {
@@ -45,6 +45,7 @@ st.markdown("""
 with st.sidebar:
     st.header("⚙️ Settings")
     selected_tone = st.selectbox("Assistant Tone", ["Friendly", "Professional", "Funny", "Technical"])
+    selectedLlmModel = st.selectbox("Select LLM Model", Config().LLM_CONFIG.keys())
 
     if st.button("🗑️ Clear Chat"):
         st.session_state.messages = []
@@ -53,6 +54,7 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+ragPipeline = RagPipline(selectedLlmModel)
 # Show chat history
 for msg in st.session_state.messages:
     if isinstance(msg, HumanMessage):

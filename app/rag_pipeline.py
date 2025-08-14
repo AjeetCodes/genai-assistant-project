@@ -5,17 +5,22 @@ import os
 from langchain.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_openai import ChatOpenAI
+from langchain_xai import ChatXAI
 # from langchain.vectorstores import Chroma
 from langchain_chroma import Chroma
 from langchain.chains import RetrievalQA
+from embeddings_wrapper import EmbeddingProvider
 import docx
 import asyncio
 
 class RagPipline:
     fileContent = ""
-    def __init__(self):
+    def __init__(self, llmModel):
         self.configObj = Config()
         self.loggerObj = AppLogger("rag_pipleline", logging.INFO).setupLogger()
+        self.llmModel = llmModel or "gemini"
         
     def loadPDFDoc(self, pdfFile):
         folderPath = os.path.join(self.configObj.ROOT_PATH, 'data')
@@ -53,7 +58,12 @@ class RagPipline:
             asyncio.set_event_loop(loop)
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         chunk = text_splitter.split_text(self.fileContent)
-        embiddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        # embiddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        embiddings = EmbeddingProvider(
+            provider=self.llmModel,
+            api_key= self.configObj.LLM_CONFIG[self.llmModel].api_key
+        ).embedding_client
+        # embiddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
         Chroma.from_texts(
             texts=chunk,
             embedding=embiddings,
@@ -66,12 +76,24 @@ class RagPipline:
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+        llmConfig = self.configObj.LLM_CONFIG[self.llmModel]
+        self.loggerObj.info(f"api key {llmConfig['api_key']}")
+        embiddingsFun = EmbeddingProvider(
+            provider=self.llmModel,
+            api_key= llmConfig['api_key']
+        )
         vector_store = Chroma(
             persist_directory='./chroma_store',
-            embedding_function=GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+            embedding_function=embiddingsFun.getEmbedingFunction()
         )
         retriever = vector_store.as_retriever()
-        llm = GoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=self.configObj.GEMINI_API_KEY)
+        kwargs = {
+            "model": llmConfig["model"],
+            llmConfig["api_key_name"]: llmConfig["api_key"]
+        }
+
+        llm = llmConfig["class"](**kwargs)
+        # llm = GoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=self.configObj.GEMINI_API_KEY)
         # RAG Chain
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,

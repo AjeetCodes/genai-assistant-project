@@ -77,10 +77,10 @@ if prompt:
             st.session_state.messages.insert(0, HumanMessage(content=system_prefix))
         
         result = ragPipeline.retriever(prompt)
-        response = result["result"] 
-        # st.subheader("🔍 Answer:")
-        # st.write(result["result"])
-        st.chat_message("assistant").markdown(f"🤖 **Gemini:** {response}")
-        st.session_state.messages.append(AIMessage(content=response))
-        
+        if 'result' in result:
+            response = result["result"] 
+            st.chat_message("assistant").markdown(f"🤖 **Gemini:** {response}")
+            st.session_state.messages.append(AIMessage(content=response))
+        else:
+            st.warning(result['error'])
     

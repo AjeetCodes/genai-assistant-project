@@ -57,7 +57,9 @@ query = st.text_input("Write your query", placeholder="Ask your query")
 if st.button("ASK") and query:
     with st.spinner("Fetching..."):
         result = ragPipeline.retriever(query)
-        st.subheader("🔍 Answer:")
-        st.write(result["result"])
-        
+        if 'result' in result:
+            st.subheader("🔍 Answer:")
+            st.write(result["result"])
+        else:
+            st.warning(result['error'])
     

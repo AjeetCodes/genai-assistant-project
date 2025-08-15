@@ -3,10 +3,11 @@ from typing import Literal, Optional
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import OllamaEmbeddings
 class EmbeddingProvider:
     def __init__(
         self,
-        provider: Literal["google", "openai", "local"],
+        provider: Literal["gemini", "openai", "local", "ollama"],
         api_key: Optional[str] = None,
         model: Optional[str] = None
     ):
@@ -20,6 +21,10 @@ class EmbeddingProvider:
             return GoogleGenerativeAIEmbeddings(
                 model=self.model or "models/embedding-001",
                 google_api_key=self.api_key
+            )
+        elif self.provider == "ollama":
+            return OllamaEmbeddings(
+                model=self.model or "nomic-embed-text"
             )
         elif self.provider == "openai":
             return OpenAIEmbeddings(
@@ -36,6 +41,10 @@ class EmbeddingProvider:
         if self.provider == "gemini":
             return GoogleGenerativeAIEmbeddings(
                 model=self.model or "models/embedding-001"
+            )
+        elif self.provider == "ollama":
+            return OllamaEmbeddings(
+                model=self.model or "nomic-embed-text"
             )
         elif self.provider == "openai":
             return OpenAIEmbeddings(

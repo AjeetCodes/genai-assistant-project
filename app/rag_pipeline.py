@@ -61,7 +61,7 @@ class RagPipline:
         # embiddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         embiddings = EmbeddingProvider(
             provider=self.llmModel,
-            api_key= self.configObj.LLM_CONFIG[self.llmModel].api_key
+            api_key= self.configObj.LLM_CONFIG[self.llmModel]['api_key']
         ).embedding_client
         # embiddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
         Chroma.from_texts(
@@ -76,36 +76,55 @@ class RagPipline:
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        llmConfig = self.configObj.LLM_CONFIG[self.llmModel]
-        self.loggerObj.info(f"api key {llmConfig['api_key']}")
-        embiddingsFun = EmbeddingProvider(
-            provider=self.llmModel,
-            api_key= llmConfig['api_key']
-        )
-        vector_store = Chroma(
-            persist_directory='./chroma_store',
-            embedding_function=embiddingsFun.getEmbedingFunction()
-        )
-        retriever = vector_store.as_retriever()
-        kwargs = {
-            "model": llmConfig["model"],
-            llmConfig["api_key_name"]: llmConfig["api_key"]
-        }
-
-        llm = llmConfig["class"](**kwargs)
-        # llm = GoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=self.configObj.GEMINI_API_KEY)
-        # RAG Chain
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            retriever=retriever,
-            return_source_documents=True  # Optional: show source context
-        )
-        # result = qa_chain(query)
-        result = qa_chain.invoke(query)
-        if "source_documents" in result:
-            for i, doc in enumerate(result["source_documents"], start=1):
-                self.loggerObj.info(f"Source {i}: {doc.metadata}")
-                self.loggerObj.info(f"Content: {doc.page_content[:200]}...")  # show first 200 chars
-        else:
-            self.loggerObj.warning("No source documents returned!")
-        return result
+        
+        try:
+            llmConfig = self.configObj.LLM_CONFIG[self.llmModel]
+            self.loggerObj.info(f"api key {llmConfig['api_key']}")
+        except KeyError as e:
+            self.loggerObj.error(f"Missing LLM config for {self.llmModel}: {e}")
+            return {"error": str(e)}
+        
+        try:
+            embiddingsFun = EmbeddingProvider(
+                provider=self.llmModel,
+                api_key= llmConfig['api_key']
+            )
+            vector_store = Chroma(
+                persist_directory='./chroma_store',
+                embedding_function=embiddingsFun.getEmbedingFunction()
+            )
+            retriever = vector_store.as_retriever()
+        except Exception as e:
+            self.loggerObj.error(f"Retriever setup failed: {e}")
+            return {"error": str(e)}
+        try:
+            kwargs = {
+                "model": llmConfig["model"],
+                llmConfig["api_key_name"]: llmConfig["api_key"]
+            }
+            if self.llmModel == 'ollama':
+                kwargs = {
+                    "model": llmConfig["model"]
+                }
+            self.loggerObj.info(f"kwargs {kwargs}")
+            llm = llmConfig["class"](**kwargs)
+            # llm = GoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=self.configObj.GEMINI_API_KEY)
+            # RAG Chain
+            qa_chain = RetrievalQA.from_chain_type(
+                llm=llm,
+                retriever=retriever,
+                return_source_documents=True  # Optional: show source context
+            )
+            # result = qa_chain(query)
+            result = qa_chain.invoke(query)
+            if "source_documents" in result:
+                for i, doc in enumerate(result["source_documents"], start=1):
+                    self.loggerObj.info(f"Source {i}: {doc.metadata}")
+                    self.loggerObj.info(f"Content: {doc.page_content[:200]}...")  # show first 200 chars
+            else:
+                self.loggerObj.warning("No source documents returned!")
+            return result
+        except Exception as e:
+            self.loggerObj.info(f"result {str(e)}")
+            # return {"result" : str(e)}
+            return {"error": str(e)}
